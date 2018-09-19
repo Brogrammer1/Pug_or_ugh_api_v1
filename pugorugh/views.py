@@ -5,7 +5,7 @@ from rest_framework.generics import (CreateAPIView, RetrieveUpdateAPIView,
                                      UpdateAPIView, RetrieveAPIView)
 from rest_framework.response import Response
 from . import serializers, models
-from django.db.models import Q
+from django.db.models import Q, Exists
 
 
 class UserRegisterView(CreateAPIView):
@@ -106,6 +106,15 @@ class DogUndecidedView(RetrieveAPIView):
         age_pref = user_preferences.age.split(',')
         gender_pref = user_preferences.gender.split(',')
         size_pref = user_preferences.size.split(',')
+        if self.kwargs['status'] == 'undecided':
+            status_value = 'u'
+
+        elif self.kwargs['status'] == 'liked':
+            status_value = 'l'
+
+        else:
+            status_value = 'd'
+
         user_preference_query = models.Dog.objects.filter(
             Q(age__in=list(range(0, 30))
             if 'b' in user_preferences.age
@@ -120,16 +129,11 @@ class DogUndecidedView(RetrieveAPIView):
             if 's' in age_pref
             else [0]),
             gender__in=gender_pref
-            , size__in=size_pref
+            , size__in=size_pref,
+            userdog__status=status_value,
+            userdog__user=self.request.user
         ).order_by('pk')
-        if self.kwargs['status'] == 'undecided':
-            user_pref_edited = user_preference_query.exclude(
-                userdog__status__contains='l')
-            return user_pref_edited.exclude(userdog__status__contains='d')
-        elif self.kwargs['status'] == 'liked':
-            return user_preference_query.filter(userdog__status__contains='l')
-        else:
-            return user_preference_query.filter(userdog__status__contains='d')
+        return user_preference_query
 
     def get_object(self):
         """returns the next dog with a pk higher then the one received or
